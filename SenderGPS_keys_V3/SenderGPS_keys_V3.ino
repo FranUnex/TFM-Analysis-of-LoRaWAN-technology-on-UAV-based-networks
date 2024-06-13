@@ -3,21 +3,12 @@
 #include <SPI.h>
 #include <Arduino_MKRGPS.h>
 
-float latitudeSum = 0;
-float longitudeSum = 0;
-float altitudeSum = 0;
-float speedSum = 0;
-float satellitesSum = 0;
-int readingsCount = 0;
-
 float latitude;
 float longitude;
 float altitude;
 float speed;
 float satellites;
 
-int CountGPSMessage = 0;
-int CountLoRaMessage = 1;
 
 LoRaModem modem;
 
@@ -36,6 +27,8 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);  // turn the LED on (HIGH is the voltage level)
 
+  Serial1.begin(9600);
+
   while (!Serial);
     // change this to your regional band (eg. US915, AS923, ...)
     if (!modem.begin(EU868)) {
@@ -43,8 +36,8 @@ void setup() {
     while (1) {}
   };
 
-    // We are using the pins  
-    if (!GPS.begin(GPS_MODE_SHIELD)) {
+    // If We want to use the pins, we need to insert GPS_MODE_SHIELD in the GPS begin
+  if (!GPS.begin(GPS_MODE_SHIELD)) {
     Serial.println("Failed to initialize GPS!");
     while (1);
   }
@@ -64,39 +57,19 @@ void setup() {
   modem.minPollInterval(60);
   
   Serial.println("Esperando para obtener señal GPS...");
-  delay(60000); // Esperar 1 minuto para obtener señal GPS
 }
 
 void loop() {
-  // check if there is new GPS data available
+
   if (GPS.available()) {
 
-      CountGPSMessage++;
+      latitude = GPS.latitude();
+      longitude = GPS.longitude();
+      altitude = GPS.altitude();
+      speed = GPS.speed();
+      satellites = GPS.satellites();
 
-      latitudeSum = 0;
-      longitudeSum = 0;
-      altitudeSum = 0;
-      speedSum = 0;
-      satellitesSum = 0;
-      readingsCount = 0;
 
-      while (readingsCount < 5) {
-        latitudeSum += GPS.latitude();
-        longitudeSum += GPS.longitude();
-        altitudeSum += GPS.altitude();
-        speedSum += GPS.speed();
-        satellitesSum += GPS.satellites();
-        readingsCount++;
-        delay(1000); // Delay between readings
-      }
-
-      readingsCount = 0;
-
-      latitude = latitudeSum / 5;
-      longitude = longitudeSum / 5;
-      altitude = altitudeSum / 5;
-      speed = speedSum / 5;
-      satellites = satellitesSum / 5;
 
       Serial.println("Nuevo mensaje GPS");
 
@@ -111,13 +84,10 @@ void loop() {
   
       // Print the hexadecimal payload message
       printHexMsg();
-
-      delay(60000);
       
       // Send the message over LoRa
       LoRa_send();
 
-      
       // Check for downlink messages
       if (!modem.available()) {
           Serial.println("No downlink message received at this time.");
@@ -138,10 +108,6 @@ void loop() {
       }
       Serial.println();
   }
-  
-  else{
-    Serial.println("Sin señal GPS");
-  }
     
 }
 
@@ -159,21 +125,17 @@ void LoRa_send() {
   modem.print(" ");
   modem.print(satellites);
   modem.print(" ");
-  modem.print(CountGPSMessage);
-  modem.print(" ");
-  modem.print(CountLoRaMessage);
 
   // Check if the message was send correctly
   int err;
   err = modem.endPacket(true);
   if (err > 0) {
       Serial.println("Message sent correctly!");
-      CountLoRaMessage++;
   } else {
     Serial.println("Error sending message!");
   }
 
-  delay(60000); //a 60 second delay to limit the amount of packets sent
+  delay(30000); //a 30 second delay to limit the amount of packets sent
 }
 
 //function that prints all readings in the Serial Monitor
@@ -189,10 +151,6 @@ void printValues() {
   Serial.print(speed);
   Serial.print(" km/h; ");
   Serial.print("Number of satellites: ");
-  Serial.print(satellites);
-  Serial.print(" Contador GPS: ");
-  Serial.print(speed);
-  Serial.print(" Contador LoRa: ");
   Serial.print(satellites);
   Serial.println();
 }
